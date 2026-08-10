@@ -1,0 +1,36 @@
+# Dependências
+/node_modules
+
+# Build do Next.js
+/.next
+/out
+/dist
+
+# Banco de dados local (SQLite) — NÃO versionar dados
+/data
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Ambiente / segredos
+.env
+.env*.local
+
+# Cloudflare/vinext (legado)
+/.wrangler
+/.openai
+
+# Pacotes de deploy / temporários
+*.tar.gz
+
+# Sistema
+.DS_Store
+*.log
+
+# Artefatos legados vinext / ferramentas locais
+/.vinext
+/.claude
+
+# Cache de build TS/Next
+tsconfig.tsbuildinfo
+next-env.d.ts
