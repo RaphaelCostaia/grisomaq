@@ -1,4 +1,5 @@
 import { env } from "../lib/server-env";
+import { ptDateToIso } from "../lib/market-parsers";
 import type { CommodityId, MarketItem, MarketPoint } from "../lib/market-types";
 
 let initialized = false;
@@ -26,22 +27,39 @@ async function ensureMarketTables() {
 export async function persistMarketSnapshots(markets: MarketItem[], collectedAt: string) {
   if (!env.DB) return;
   await ensureMarketTables();
-  const statements = markets
-    .filter((market) => market.value !== null && market.observedAt && market.status !== "unavailable")
-    .map((market) => env.DB.prepare(
-      `INSERT OR IGNORE INTO market_snapshots
-        (commodity, value, change, unit, source, provider, observed_at, collected_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(
-      market.id,
-      market.value,
-      market.change,
-      market.unit,
-      market.source,
-      market.provider,
-      market.observedAt,
-      collectedAt,
-    ));
+  const statements: ReturnType<typeof env.DB.prepare>[] = [];
+  for (const market of markets) {
+    if (market.value === null || market.status === "unavailable") continue;
+    // Persiste a JANELA inteira devolvida pela fonte (não só o último fechamento),
+    // para o histórico acumular mesmo com acesso esporádico. O índice único
+    // (commodity, observed_at) + INSERT OR IGNORE evita duplicar o mesmo dia.
+    const points = market.history.length
+      ? market.history.map((point) => ({
+          observedAt: point.date.includes("/") ? ptDateToIso(point.date) : point.date,
+          value: point.value,
+          change: point.change,
+        }))
+      : market.observedAt
+        ? [{ observedAt: market.observedAt, value: market.value, change: market.change }]
+        : [];
+    for (const point of points) {
+      if (point.value === null || !point.observedAt) continue;
+      statements.push(env.DB.prepare(
+        `INSERT OR IGNORE INTO market_snapshots
+          (commodity, value, change, unit, source, provider, observed_at, collected_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(
+        market.id,
+        point.value,
+        point.change,
+        market.unit,
+        market.source,
+        market.provider,
+        point.observedAt,
+        collectedAt,
+      ));
+    }
+  }
 
   if (statements.length) await env.DB.batch(statements);
   await env.DB.prepare("DELETE FROM market_snapshots WHERE collected_at < datetime('now', '-400 days')").run();

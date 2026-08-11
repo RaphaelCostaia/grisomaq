@@ -4,5 +4,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startBackupScheduler } = await import("./lib/backup");
     startBackupScheduler();
+    const { startMarketCollector } = await import("./lib/market-collect");
+    startMarketCollector();
   }
 }
