@@ -24,8 +24,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Informe usuário e senha." }, { status: 400 });
   }
 
-  // Proteção contra força-bruta.
-  const rate = await checkLoginRateLimit(username);
+  // Proteção contra força-bruta (por usuário e por IP).
+  const ip = readClientIp(request);
+  const rate = await checkLoginRateLimit(username, ip);
   if (rate.blocked) {
     return NextResponse.json(
       { error: `Muitas tentativas. Tente novamente em cerca de ${Math.ceil(rate.retryAfterSec / 60)} min.` },
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
 
   const user = await verifyCredentials(username, password);
   if (!user) {
-    await recordFailedLogin(username, readClientIp(request));
+    await recordFailedLogin(username, ip);
     return NextResponse.json({ error: "Usuário ou senha inválidos." }, { status: 401 });
   }
 

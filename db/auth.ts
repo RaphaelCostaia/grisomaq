@@ -46,20 +46,38 @@ export function readClientIp(request: Request): string {
 }
 
 const RATE_WINDOW_MS = 15 * 60 * 1000;
-const RATE_MAX_ATTEMPTS = 5;
+const RATE_MAX_ATTEMPTS = 5; // por usuário
+const RATE_MAX_PER_IP = 20; // por IP (cobre ataque que varia o nome de usuário)
 
-// Bloqueia força-bruta: após 5 tentativas falhas no mesmo usuário em 15 min.
-export async function checkLoginRateLimit(username: string): Promise<{ blocked: boolean; retryAfterSec: number }> {
+// Bloqueia força-bruta em 15 min: 5 tentativas falhas no mesmo usuário OU 20
+// tentativas falhas vindas do mesmo IP (barra quem varia o nome de usuário).
+export async function checkLoginRateLimit(username: string, ip?: string): Promise<{ blocked: boolean; retryAfterSec: number }> {
   if (!env.DB) return { blocked: false, retryAfterSec: 0 };
   await ensureAuthTables();
   const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
-  const row = await env.DB
+
+  const byUser = await env.DB
     .prepare("SELECT COUNT(*) AS count, MIN(at) AS oldest FROM login_attempts WHERE username = ? AND at >= ?")
     .bind(username.trim().toLowerCase(), since)
     .first<{ count: number; oldest: string | null }>();
-  const count = Number(row?.count ?? 0);
-  if (count < RATE_MAX_ATTEMPTS) return { blocked: false, retryAfterSec: 0 };
-  const oldestMs = row?.oldest ? Date.parse(row.oldest) : Date.now();
+
+  const byIp = ip && ip !== "desconhecido"
+    ? await env.DB
+        .prepare("SELECT COUNT(*) AS count, MIN(at) AS oldest FROM login_attempts WHERE ip = ? AND at >= ?")
+        .bind(ip, since)
+        .first<{ count: number; oldest: string | null }>()
+    : null;
+
+  const userBlocked = Number(byUser?.count ?? 0) >= RATE_MAX_ATTEMPTS;
+  const ipBlocked = Number(byIp?.count ?? 0) >= RATE_MAX_PER_IP;
+  if (!userBlocked && !ipBlocked) return { blocked: false, retryAfterSec: 0 };
+
+  // Usa a tentativa mais antiga da dimensão que bloqueou para calcular o Retry-After.
+  const oldestCandidates = [
+    userBlocked && byUser?.oldest ? Date.parse(byUser.oldest) : null,
+    ipBlocked && byIp?.oldest ? Date.parse(byIp.oldest) : null,
+  ].filter((v): v is number => v !== null);
+  const oldestMs = oldestCandidates.length ? Math.min(...oldestCandidates) : Date.now();
   return { blocked: true, retryAfterSec: Math.max(1, Math.ceil((oldestMs + RATE_WINDOW_MS - Date.now()) / 1000)) };
 }
 
