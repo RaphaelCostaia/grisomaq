@@ -278,6 +278,19 @@ textarea { padding: 10px; resize: vertical; }
 .notification-option strong, .notification-option small { display: block; }
 .notification-option strong { font-size: 12px; }
 .notification-option small { margin-top: 3px; color: #718279; font-size: 11px; }
+.targets-block { margin-top: 14px; padding: 12px; border: 1px solid var(--border-soft); border-radius: 9px; background: #0b1210; }
+.targets-head strong { display: block; color: #d4dfd9; font-size: 12px; }
+.targets-head small { display: block; margin-top: 4px; color: #718279; font-size: 11px; }
+.targets-form { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.targets-form select, .targets-form input { padding: 8px 9px; border: 1px solid var(--border-soft); border-radius: 7px; background: #0d1512; color: #d4dfd9; font-size: 12px; }
+.targets-form input { width: 96px; }
+.targets-form select { flex: 1 1 auto; min-width: 90px; }
+.targets-form .secondary-button { flex: 0 0 auto; }
+.targets-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.targets-list li { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 7px; background: #0d1512; color: #c7d3cc; font-size: 12px; }
+.targets-list li b { color: var(--green); }
+.targets-list li button { width: 22px; height: 22px; border: 1px solid var(--border-soft); border-radius: 6px; background: transparent; color: #8aa; cursor: pointer; line-height: 1; }
+.targets-list li button:hover { color: #ff9b9b; border-color: rgba(255,107,107,.4); }
 .modal-actions { margin-top: 18px; display: flex; justify-content: flex-end; gap: 9px; }
 
 /* News and report workspaces */

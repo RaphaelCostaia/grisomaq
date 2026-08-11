@@ -24,6 +24,9 @@ import type {
 
 type PeriodDays = 7 | 30 | 90;
 type AlertPreferences = { price: boolean; basis: boolean; news: boolean; source: boolean };
+type PriceTarget = { commodity: CommodityId; direction: "above" | "below"; value: number };
+
+const TARGETS_KEY = "grisomaq-price-targets-v1";
 
 const EMPTY_DATA: MarketResponse = {
   markets: [],
@@ -150,6 +153,10 @@ export default function Home() {
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("visao-geral");
   const [alertPreferences, setAlertPreferences] = useState<AlertPreferences>(DEFAULT_ALERT_PREFERENCES);
+  const [targets, setTargets] = useState<PriceTarget[]>([]);
+  const [targetCommodity, setTargetCommodity] = useState<CommodityId>("milho");
+  const [targetDirection, setTargetDirection] = useState<"above" | "below">("above");
+  const [targetValue, setTargetValue] = useState("");
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [volume, setVolume] = useState(1000);
   const [unitCost, setUnitCost] = useState(52);
@@ -204,6 +211,15 @@ export default function Home() {
       } catch {
         window.localStorage.removeItem("grisomaq-alert-preferences-v2");
       }
+      try {
+        const savedTargets = window.localStorage.getItem(TARGETS_KEY);
+        if (savedTargets) {
+          const parsed = JSON.parse(savedTargets);
+          if (Array.isArray(parsed)) setTargets(parsed.filter((t: PriceTarget) => t && typeof t.value === "number"));
+        }
+      } catch {
+        window.localStorage.removeItem(TARGETS_KEY);
+      }
       setNotificationPermission("Notification" in window ? Notification.permission : "unsupported");
     }, 0);
     return () => window.clearTimeout(startup);
@@ -235,7 +251,30 @@ export default function Home() {
     [activeMarket, data.futures, data.news, data.currency],
   );
   const allAlerts = useMemo(() => buildAlerts(data.markets, data.futures, data.news, data.currency), [data.markets, data.futures, data.news, data.currency]);
-  const visibleAlerts = allAlerts.filter((alert) => alertPreferences[alert.category]);
+  // Alertas de alvo definido pelo usuário: dispara quando o fechamento atual cruza o limite.
+  const targetAlerts = useMemo<MarketAlert[]>(() => {
+    const out: MarketAlert[] = [];
+    for (const target of targets) {
+      const market = data.markets.find((m) => m.id === target.commodity);
+      if (!market || market.value === null || market.status === "unavailable") continue;
+      const crossed = target.direction === "above" ? market.value >= target.value : market.value <= target.value;
+      if (!crossed) continue;
+      out.push({
+        id: `target-${target.commodity}-${target.direction}-${target.value}`,
+        commodity: target.commodity,
+        level: "high",
+        category: "price",
+        title: `${market.name}: alvo ${target.direction === "above" ? "atingido" : "atingido para baixo"} (R$ ${formatMoney(target.value)})`,
+        description: `Fechamento atual R$ ${formatMoney(market.value)} ${target.direction === "above" ? "≥" : "≤"} seu alvo de R$ ${formatMoney(target.value)}.`,
+        action: "Avalie proteção ou execução conforme sua estratégia; o alvo permanece salvo neste dispositivo.",
+      });
+    }
+    return out;
+  }, [targets, data.markets]);
+  const visibleAlerts = useMemo(
+    () => [...targetAlerts, ...allAlerts.filter((alert) => alertPreferences[alert.category])],
+    [targetAlerts, allAlerts, alertPreferences],
+  );
   const regional = data.regionalQuotes.filter((quote) => quote.commodity === activeCommodity).slice(0, 8);
   const futures = data.futures.filter((future) => future.commodity === activeCommodity).slice(0, 6);
   const relatedNews = data.news.filter((item) => item.tag.toLowerCase() === commodityLabel(activeCommodity).toLowerCase());
@@ -265,6 +304,34 @@ export default function Home() {
     if (id === "soja") { setUnitCost(112); setFreight(5); }
     if (id === "boi") { setUnitCost(292); setFreight(4); }
     document.getElementById("cotacoes")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function persistTargets(next: PriceTarget[]) {
+    setTargets(next);
+    try {
+      window.localStorage.setItem(TARGETS_KEY, JSON.stringify(next));
+    } catch {
+      // localStorage indisponível; alvos ficam só em memória nesta sessão.
+    }
+  }
+
+  function addTarget() {
+    const value = Math.round((Number(targetValue.replace(",", ".")) || 0) * 100) / 100;
+    if (value <= 0) {
+      setToast("Informe um valor de alvo maior que zero.");
+      return;
+    }
+    const next = [
+      ...targets.filter((t) => !(t.commodity === targetCommodity && t.direction === targetDirection)),
+      { commodity: targetCommodity, direction: targetDirection, value },
+    ];
+    persistTargets(next);
+    setTargetValue("");
+    setToast(`Alvo salvo: ${commodityLabel(targetCommodity)} ${targetDirection === "above" ? "≥" : "≤"} R$ ${formatMoney(value)}.`);
+  }
+
+  function removeTarget(target: PriceTarget) {
+    persistTargets(targets.filter((t) => !(t.commodity === target.commodity && t.direction === target.direction && t.value === target.value)));
   }
 
   function saveAlertPreferences() {
@@ -490,6 +557,32 @@ export default function Home() {
           ] as const).map(([key, title, description]) => (
             <label className="setting-row" key={key}><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={alertPreferences[key]} onChange={(event) => setAlertPreferences((current) => ({ ...current, [key]: event.target.checked }))} /></label>
           ))}
+        </div>
+        <div className="targets-block">
+          <div className="targets-head"><strong>Alvos de preço</strong><small>Avisa quando o fechamento cruzar o valor que você definir. Salvo neste dispositivo.</small></div>
+          <div className="targets-form">
+            <select aria-label="Commodity do alvo" value={targetCommodity} onChange={(e) => setTargetCommodity(e.target.value as CommodityId)}>
+              <option value="milho">Milho</option>
+              <option value="soja">Soja</option>
+              <option value="boi">Boi</option>
+            </select>
+            <select aria-label="Direção do alvo" value={targetDirection} onChange={(e) => setTargetDirection(e.target.value as "above" | "below")}>
+              <option value="above">subir até / passar de (≥)</option>
+              <option value="below">cair até / abaixo de (≤)</option>
+            </select>
+            <input inputMode="decimal" placeholder="R$ 0,00" value={targetValue} onChange={(e) => setTargetValue(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addTarget(); }} aria-label="Valor do alvo" />
+            <button type="button" className="secondary-button" onClick={addTarget}>Adicionar</button>
+          </div>
+          {targets.length > 0 && (
+            <ul className="targets-list">
+              {targets.map((t) => (
+                <li key={`${t.commodity}-${t.direction}-${t.value}`}>
+                  <span>{commodityLabel(t.commodity)} {t.direction === "above" ? "≥" : "≤"} <b>R$ {formatMoney(t.value)}</b></span>
+                  <button type="button" onClick={() => removeTarget(t)} aria-label={`Remover alvo de ${commodityLabel(t.commodity)}`}>×</button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <button className="notification-option" onClick={() => void enableNotifications()} disabled={notificationPermission === "granted"}><span aria-hidden="true">◉</span><span><strong>{notificationPermission === "granted" ? "Avisos do navegador ativos" : "Ativar avisos do navegador"}</strong><small>O navegador solicitará permissão; não envia dados para terceiros.</small></span></button>
         <div className="modal-actions"><button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancelar</button><button className="primary-button" onClick={saveAlertPreferences}>Salvar preferências</button></div>
