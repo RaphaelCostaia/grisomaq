@@ -131,10 +131,6 @@ button.market-card:hover, a.market-card:hover { transform: translateY(-1px); bor
 .chart-notice > span { color: var(--gold); font-weight: 700; }
 .chart-notice p { margin: 0; font-size: 12px; line-height: 1.5; color: #d8cfb4; }
 .chart-notice b { color: var(--gold); }
-.realtime-note { display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px; margin: 14px 0 0; padding: 11px 14px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--panel-soft); color: var(--muted); font-size: 12px; line-height: 1.55; }
-.realtime-note > span { color: var(--gold); }
-.realtime-note b { color: #cdd8d1; font-weight: 650; }
-.realtime-note a { color: var(--green); }
 .chart-empty { min-height: 225px; display: grid; place-content: center; text-align: center; gap: 6px; color: #718279; }
 .chart-empty strong { color: #aebcb4; font-size: 13.5px; }
 .chart-empty span { font-size: 12px; }

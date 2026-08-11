@@ -409,12 +409,6 @@ export default function Home() {
           </button>
         </section>
 
-        {!loading && (
-          <p className="realtime-note" role="note">
-            <span aria-hidden="true">◷</span>
-            Físico e câmbio são <b>fechamentos diários</b>; futuros B3 usam <b>fechamento público D-1</b>. <b>Não é cotação em tempo real</b> — o feed intradiário licenciado (B3) e as análises Safras &amp; Scot ainda dependem de contrato. Veja o estado de cada fonte em <a href="#fontes">Fontes</a>.
-          </p>
-        )}
 
         {activeMarket && (
           <section className="decision-grid">
