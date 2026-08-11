@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
+import { Modal } from "./Modal";
 import type { MarketResponse } from "../../lib/market-types";
 
 type NavItem = { label: string; icon: string } & ({ hash: string } | { href: string });
@@ -32,6 +34,56 @@ export function AppSidebar({ data, activeSection }: { data: MarketResponse | nul
   const isHome = pathname === "/";
   const responding = data ? data.sources.filter((source) => source.status !== "unavailable").length : 0;
   const mode = data?.mode ?? "unavailable";
+
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [feedback, setFeedback] = useState<{ type: "ok" | "error"; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  function closePassword() {
+    setPasswordOpen(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setFeedback(null);
+    setSaving(false);
+  }
+
+  async function submitPassword() {
+    if (newPassword !== confirmPassword) {
+      setFeedback({ type: "error", text: "A confirmação não confere com a nova senha." });
+      return;
+    }
+    if (newPassword.length < 8) {
+      setFeedback({ type: "error", text: "A nova senha precisa ter ao menos 8 caracteres." });
+      return;
+    }
+    setSaving(true);
+    setFeedback(null);
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setFeedback({ type: "error", text: result?.error ?? "Não foi possível trocar a senha." });
+        setSaving(false);
+        return;
+      }
+      setFeedback({ type: "ok", text: "Senha alterada. As demais sessões foram encerradas." });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch {
+      setFeedback({ type: "error", text: "Falha de conexão ao trocar a senha." });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <aside className="sidebar" aria-label="Navegação principal">
@@ -65,8 +117,25 @@ export function AppSidebar({ data, activeSection }: { data: MarketResponse | nul
         <div className="source-mini"><span className={`status-dot ${mode}`} /> {responding} fontes com resposta</div>
         <p>Físico, futuro, câmbio e fundamentos com origem e horário identificados.</p>
         <div className="profile"><span>DR</span><div><strong>Diretoria</strong><small>Grisomaq</small></div></div>
-        <button type="button" className="sidebar-logout" onClick={() => void logout()}><span aria-hidden="true">⏻</span> Sair</button>
+        <div className="sidebar-account">
+          <button type="button" className="sidebar-account-btn" onClick={() => setPasswordOpen(true)}><span aria-hidden="true">⚿</span> Trocar senha</button>
+          <button type="button" className="sidebar-logout" onClick={() => void logout()}><span aria-hidden="true">⏻</span> Sair</button>
+        </div>
       </div>
+
+      {passwordOpen && (
+        <Modal titleId="password-title" onClose={closePassword}>
+          <div className="modal-head"><div><span className="section-kicker">Conta</span><h2 id="password-title">Trocar senha</h2></div><button className="icon-button" onClick={closePassword} aria-label="Fechar">×</button></div>
+          <p>Defina uma nova senha de acesso ao painel. As outras sessões abertas serão encerradas.</p>
+          <div className="password-form">
+            <label>Senha atual<input type="password" autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} /></label>
+            <label>Nova senha (mín. 8 caracteres)<input type="password" autoComplete="new-password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></label>
+            <label>Confirmar nova senha<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void submitPassword(); }} /></label>
+          </div>
+          {feedback && <div className={`password-feedback ${feedback.type}`} role="status">{feedback.text}</div>}
+          <div className="modal-actions"><button className="secondary-button" onClick={closePassword}>Fechar</button><button className="primary-button" onClick={() => void submitPassword()} disabled={saving}>{saving ? "Salvando…" : "Salvar nova senha"}</button></div>
+        </Modal>
+      )}
     </aside>
   );
 }

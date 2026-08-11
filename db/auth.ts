@@ -1,5 +1,5 @@
 import { env } from "../lib/server-env";
-import { verifyPassword } from "../lib/auth-hash";
+import { hashPassword, verifyPassword } from "../lib/auth-hash";
 
 export type AuthUser = { id: number; username: string };
 
@@ -94,6 +94,25 @@ export async function verifyCredentials(username: string, password: string): Pro
   return ok ? { id: row.id, username: row.username } : null;
 }
 
+// Troca de senha: exige a senha atual correta. Retorna motivo do erro ou null (ok).
+export async function updatePassword(
+  username: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<"invalid_current" | "weak" | null> {
+  if (!env.DB) return "invalid_current";
+  await ensureAuthTables();
+  if (newPassword.length < 8) return "weak";
+  const user = await verifyCredentials(username, currentPassword);
+  if (!user) return "invalid_current";
+  const hash = await hashPassword(newPassword);
+  await env.DB
+    .prepare("UPDATE users SET password_hash = ? WHERE username = ?")
+    .bind(hash, username.trim().toLowerCase())
+    .run();
+  return null;
+}
+
 export async function createSession(user: AuthUser, days = 7): Promise<{ token: string; expiresAt: string }> {
   await ensureAuthTables();
   const token = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
@@ -126,4 +145,13 @@ export async function getSessionUser(token: string | null): Promise<AuthUser | n
 export async function deleteSession(token: string | null) {
   if (!env.DB || !token) return;
   await env.DB.prepare("DELETE FROM sessions WHERE token = ?").bind(token).run();
+}
+
+// Encerra todas as sessões do usuário, exceto a atual (usado após trocar senha).
+export async function deleteOtherSessions(username: string, keepToken: string) {
+  if (!env.DB) return;
+  await env.DB
+    .prepare("DELETE FROM sessions WHERE username = ? AND token != ?")
+    .bind(username.trim().toLowerCase(), keepToken)
+    .run();
 }
