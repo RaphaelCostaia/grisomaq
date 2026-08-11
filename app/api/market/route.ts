@@ -31,6 +31,8 @@ const NOTICIAS_BASE = "https://www.noticiasagricolas.com.br";
 const NOTICIAS_BETA = "https://beta.noticiasagricolas.com.br";
 const CONAB_NEWS = "https://www.gov.br/conab/pt-br/assuntos/noticias";
 const BCB_DATASET = "https://dadosabertos.bcb.gov.br/pt_BR/dataset/dolar-americano-usd-todos-os-boletins-diarios";
+// Widget oficial e público do CEPEA (2ª fonte independente do Notícias Agrícolas).
+const CEPEA_WIDGET = "https://www.cepea.org.br/br/widgetproduto.js.php?fonte=carousel&id_indicador%5B%5D=";
 
 const definitions: Array<{
   id: CommodityId;
@@ -40,6 +42,7 @@ const definitions: Array<{
   quoteUrl: string;
   historyUrl: string;
   regionalAnchor: string;
+  cepeaId?: string; // id do indicador no widget do CEPEA (fonte de fallback)
 }> = [
   {
     id: "milho",
@@ -49,6 +52,7 @@ const definitions: Array<{
     quoteUrl: `${NOTICIAS_BETA}/cotacoes/milho`,
     historyUrl: `${NOTICIAS_BETA}/cotacoes/milho/indicador-cepea-esalq-milho`,
     regionalAnchor: "Milho - Mercado Físico Fonte: Notícias Agrícolas",
+    cepeaId: "77",
   },
   {
     id: "soja",
@@ -67,6 +71,7 @@ const definitions: Array<{
     quoteUrl: `${NOTICIAS_BETA}/cotacoes/boi-gordo`,
     historyUrl: `${NOTICIAS_BETA}/cotacoes/boi-gordo/boi-gordo-indicador-esalq-bmf`,
     regionalAnchor: "Mercado Físico - Scot Consultoria",
+    cepeaId: "2",
   },
 ];
 
@@ -95,6 +100,44 @@ async function fetchJson<T>(url: string): Promise<T | null> {
     return JSON.parse(result.text) as T;
   } catch {
     return null;
+  }
+}
+
+// Redundância de endpoint: tenta o Notícias Agrícolas (beta) e, se falhar,
+// o mesmo caminho no domínio www — sobrevive à queda de um dos dois.
+async function fetchNa(url: string): Promise<FetchResult> {
+  const primary = await fetchText(url);
+  if (primary.ok && primary.text) return primary;
+  const alt = url.includes("beta.noticiasagricolas")
+    ? url.replace("beta.noticiasagricolas", "www.noticiasagricolas")
+    : url.replace("www.noticiasagricolas", "beta.noticiasagricolas");
+  return alt === url ? primary : fetchText(alt);
+}
+
+// 2ª fonte independente: widget público oficial do CEPEA (valor + data do dia).
+// Usa user-agent de navegador — o CEPEA bloqueia UAs não-navegador.
+async function fetchCepea(id: string): Promise<{ value: number; date: string } | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6500);
+  try {
+    const response = await fetch(`${CEPEA_WIDGET}${id}`, {
+      headers: {
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "accept-language": "pt-BR,pt;q=0.9",
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) return null;
+    const text = cleanHtml(await response.text());
+    const valueMatch = text.match(/R\$\s*([\d.]+,\d{2})/);
+    if (!valueMatch) return null;
+    const value = ptNumber(valueMatch[1]);
+    if (value === null || value <= 0) return null;
+    return { value, date: text.match(/(\d{2}\/\d{2}\/\d{4})/)?.[1] ?? "" };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -347,15 +390,34 @@ export async function GET(request: Request) {
 
   const collectedAt = new Date().toISOString();
   const nextRefreshAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-  const [quoteResults, historyResults, noticiasResult, conabResult, currency] = await Promise.all([
-    Promise.all(definitions.map((definition) => fetchText(definition.quoteUrl))),
-    Promise.all(definitions.map((definition) => fetchText(definition.historyUrl))),
-    fetchText(NOTICIAS_BASE),
+  const [quoteResults, historyResults, noticiasResult, conabResult, currency, cepeaResults] = await Promise.all([
+    Promise.all(definitions.map((definition) => fetchNa(definition.quoteUrl))),
+    Promise.all(definitions.map((definition) => fetchNa(definition.historyUrl))),
+    fetchNa(NOTICIAS_BASE),
     fetchText(CONAB_NEWS),
     fetchCurrency(),
+    Promise.all(definitions.map((definition) => (definition.cepeaId ? fetchCepea(definition.cepeaId) : Promise.resolve(null)))),
   ]);
 
   let markets = definitions.map((definition, index) => parseMarket(definition, historyResults[index]));
+
+  // Camada 2 de redundância: se o Notícias Agrícolas não trouxe o valor físico,
+  // usa o widget oficial do CEPEA (fonte independente) para milho e boi.
+  markets = markets.map((market, index) => {
+    if (market.value !== null) return market;
+    const cepea = cepeaResults[index];
+    if (!cepea) return market;
+    return {
+      ...market,
+      value: cepea.value,
+      change: null,
+      status: "delayed",
+      provider: "CEPEA (widget oficial)",
+      reference: cepea.date || "Fechamento CEPEA",
+      observedAt: cepea.date ? ptDateToIso(cepea.date) : null,
+      history: cepea.date ? [{ date: cepea.date, value: cepea.value, change: null }] : market.history,
+    };
+  });
   const futures = definitions.flatMap((definition, index) => parseFutures(definition, quoteResults[index]));
   const regionalQuotes = definitions.flatMap((definition, index) => parseRegionalQuotes(definition, quoteResults[index]));
   const news = [
@@ -366,7 +428,24 @@ export async function GET(request: Request) {
   try {
     await persistMarketSnapshots(markets, collectedAt);
     const storedHistories = await Promise.all(markets.map((market) => readStoredHistory(market.id)));
-    markets = markets.map((market, index) => ({ ...market, history: mergeHistory(market.history, storedHistories[index]) }));
+    markets = markets.map((market, index) => {
+      const history = mergeHistory(market.history, storedHistories[index]);
+      // Camada 3: se nem NA nem CEPEA responderam, mostra o último fechamento
+      // salvo (com data e marcado como "última consulta") — nunca perde tudo.
+      if (market.value === null && history.length > 0) {
+        const last = history[0];
+        return {
+          ...market,
+          history,
+          value: last.value,
+          change: last.change,
+          status: "delayed",
+          reference: `${last.date} · última consulta`,
+          observedAt: ptDateToIso(last.date),
+        };
+      }
+      return { ...market, history };
+    });
   } catch {
     // The live payload remains usable if the historical store is temporarily unavailable.
   }
@@ -375,10 +454,10 @@ export async function GET(request: Request) {
   const sources: SourceItem[] = [
     {
       name: "CEPEA/Esalq",
-      role: "Indicadores físicos diários",
+      role: "Indicadores físicos diários (com redundância)",
       href: "https://www.cepea.esalq.usp.br/br/indicador/",
-      status: sourceStatus(physicalCount > 0, physicalCount > 0 && physicalCount < definitions.length),
-      message: `${physicalCount}/3 indicadores com fechamento e data validados via página pública do Notícias Agrícolas.`,
+      status: sourceStatus(markets.some((market) => market.value !== null), markets.some((market) => market.value === null || market.status === "delayed")),
+      message: `${physicalCount}/3 indicadores ao vivo. Redundância em 3 camadas: Notícias Agrícolas (beta/www) → widget oficial do CEPEA (milho/boi) → último fechamento salvo no banco.`,
       checkedAt: collectedAt,
       frequency: "Fechamento diário",
     },
