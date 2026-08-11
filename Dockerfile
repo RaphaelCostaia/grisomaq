@@ -25,7 +25,7 @@ EXPOSE 3000
 
 # Health check próprio (bate em /login, que responde 200) — evita o loop de reinício.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=5 \
-  CMD curl -fsS http://localhost:3000/login || exit 1
+  CMD curl -fsS http://localhost:3000/api/health || exit 1
 
 # Roda o Next diretamente (sinais tratados melhor que via npm).
 CMD ["node", "node_modules/next/dist/bin/next", "start", "-p", "3000"]
