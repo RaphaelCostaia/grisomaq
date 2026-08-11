@@ -43,6 +43,7 @@ const definitions: Array<{
   historyUrl: string;
   regionalAnchor: string;
   cepeaId?: string; // id do indicador no widget do CEPEA (fonte de fallback)
+  cepeaNote?: string; // praça do CEPEA quando difere do indicador primário (transparência)
 }> = [
   {
     id: "milho",
@@ -62,6 +63,8 @@ const definitions: Array<{
     quoteUrl: `${NOTICIAS_BETA}/cotacoes/soja`,
     historyUrl: `${NOTICIAS_BETA}/cotacoes/soja/indicador-cepea-esalq-soja-parana`,
     regionalAnchor: "Soja - Mercado Físico Fonte: Notícias Agrícolas",
+    cepeaId: "92", // Soja CEPEA/ESALQ Paranaguá (sc 60kg) — praça alternativa, mesma unidade
+    cepeaNote: "CEPEA Paranaguá",
   },
   {
     id: "boi",
@@ -402,18 +405,22 @@ export async function GET(request: Request) {
   let markets = definitions.map((definition, index) => parseMarket(definition, historyResults[index]));
 
   // Camada 2 de redundância: se o Notícias Agrícolas não trouxe o valor físico,
-  // usa o widget oficial do CEPEA (fonte independente) para milho e boi.
+  // usa o widget oficial do CEPEA (fonte independente): milho, boi e soja (Paranaguá).
   markets = markets.map((market, index) => {
     if (market.value !== null) return market;
     const cepea = cepeaResults[index];
     if (!cepea) return market;
+    const note = definitions[index].cepeaNote;
     return {
       ...market,
+      // Se a praça do CEPEA difere do indicador primário (soja: Paranaguá),
+      // deixa explícito no nome curto para não representar Paranaguá como Paraná.
+      shortName: note ? `${market.name} · ${note}` : market.shortName,
       value: cepea.value,
       change: null,
       status: "delayed",
-      provider: "CEPEA (widget oficial)",
-      reference: cepea.date || "Fechamento CEPEA",
+      provider: note ? `CEPEA (${note})` : "CEPEA (widget oficial)",
+      reference: note ? `${note} · ${cepea.date || "fechamento"}` : (cepea.date || "Fechamento CEPEA"),
       observedAt: cepea.date ? ptDateToIso(cepea.date) : null,
       history: cepea.date ? [{ date: cepea.date, value: cepea.value, change: null }] : market.history,
     };
@@ -457,7 +464,7 @@ export async function GET(request: Request) {
       role: "Indicadores físicos diários (com redundância)",
       href: "https://www.cepea.esalq.usp.br/br/indicador/",
       status: sourceStatus(markets.some((market) => market.value !== null), markets.some((market) => market.value === null || market.status === "delayed")),
-      message: `${physicalCount}/3 indicadores ao vivo. Redundância em 3 camadas: Notícias Agrícolas (beta/www) → widget oficial do CEPEA (milho/boi) → último fechamento salvo no banco.`,
+      message: `${physicalCount}/3 indicadores ao vivo. Redundância em 3 camadas: Notícias Agrícolas (beta/www) → widget oficial do CEPEA (milho, boi e soja/Paranaguá) → último fechamento salvo no banco.`,
       checkedAt: collectedAt,
       frequency: "Fechamento diário",
     },
