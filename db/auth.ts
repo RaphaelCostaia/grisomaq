@@ -22,6 +22,13 @@ async function ensureAuthTables() {
       created_at TEXT NOT NULL
     )`),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS sessions_user_idx ON sessions (user_id)"),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS login_attempts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL,
+      ip TEXT NOT NULL,
+      at TEXT NOT NULL
+    )`),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS login_attempts_idx ON login_attempts (username, at)"),
   ]);
   initialized = true;
 }
@@ -30,6 +37,49 @@ export function readSessionToken(request: Request): string | null {
   const cookie = request.headers.get("cookie") ?? "";
   const match = cookie.match(/(?:^|;\s*)gq_session=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+export function readClientIp(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]!.trim();
+  return request.headers.get("x-real-ip") ?? "desconhecido";
+}
+
+const RATE_WINDOW_MS = 15 * 60 * 1000;
+const RATE_MAX_ATTEMPTS = 5;
+
+// Bloqueia força-bruta: após 5 tentativas falhas no mesmo usuário em 15 min.
+export async function checkLoginRateLimit(username: string): Promise<{ blocked: boolean; retryAfterSec: number }> {
+  if (!env.DB) return { blocked: false, retryAfterSec: 0 };
+  await ensureAuthTables();
+  const since = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+  const row = await env.DB
+    .prepare("SELECT COUNT(*) AS count, MIN(at) AS oldest FROM login_attempts WHERE username = ? AND at >= ?")
+    .bind(username.trim().toLowerCase(), since)
+    .first<{ count: number; oldest: string | null }>();
+  const count = Number(row?.count ?? 0);
+  if (count < RATE_MAX_ATTEMPTS) return { blocked: false, retryAfterSec: 0 };
+  const oldestMs = row?.oldest ? Date.parse(row.oldest) : Date.now();
+  return { blocked: true, retryAfterSec: Math.max(1, Math.ceil((oldestMs + RATE_WINDOW_MS - Date.now()) / 1000)) };
+}
+
+export async function recordFailedLogin(username: string, ip: string) {
+  if (!env.DB) return;
+  await ensureAuthTables();
+  await env.DB
+    .prepare("INSERT INTO login_attempts (username, ip, at) VALUES (?, ?, ?)")
+    .bind(username.trim().toLowerCase(), ip, new Date().toISOString())
+    .run();
+  await env.DB
+    .prepare("DELETE FROM login_attempts WHERE at < ?")
+    .bind(new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .run();
+}
+
+export async function clearLoginAttempts(username: string) {
+  if (!env.DB) return;
+  await ensureAuthTables();
+  await env.DB.prepare("DELETE FROM login_attempts WHERE username = ?").bind(username.trim().toLowerCase()).run();
 }
 
 export async function verifyCredentials(username: string, password: string): Promise<AuthUser | null> {

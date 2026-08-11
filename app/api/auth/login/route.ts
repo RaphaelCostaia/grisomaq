@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { createSession, verifyCredentials } from "../../../../db/auth";
+import {
+  checkLoginRateLimit,
+  clearLoginAttempts,
+  createSession,
+  readClientIp,
+  recordFailedLogin,
+  verifyCredentials,
+} from "../../../../db/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,13 +24,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Informe usuário e senha." }, { status: 400 });
   }
 
+  // Proteção contra força-bruta.
+  const rate = await checkLoginRateLimit(username);
+  if (rate.blocked) {
+    return NextResponse.json(
+      { error: `Muitas tentativas. Tente novamente em cerca de ${Math.ceil(rate.retryAfterSec / 60)} min.` },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSec) } },
+    );
+  }
+
   const user = await verifyCredentials(username, password);
   if (!user) {
+    await recordFailedLogin(username, readClientIp(request));
     return NextResponse.json({ error: "Usuário ou senha inválidos." }, { status: 401 });
   }
 
+  await clearLoginAttempts(username);
   const { token, expiresAt } = await createSession(user);
-  const secure = new URL(request.url).protocol === "https:";
+  const secure = new URL(request.url).protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
   const cookie = [
     `gq_session=${token}`,
     "HttpOnly",
