@@ -57,6 +57,16 @@ class D1Statement {
   }
 }
 
+// Handle bruto do better-sqlite3 — usado pelo backup online (`.backup()`) e por
+// scripts. Os módulos de dados devem continuar usando `env.DB` (API D1).
+export function rawDb(): Database.Database {
+  return db();
+}
+
+export function dbPath(): string {
+  return resolve(process.env.GRISOMAQ_DB_PATH ?? "./data/grisomaq.db");
+}
+
 const D1 = {
   prepare(sql: string) {
     return new D1Statement(sql);

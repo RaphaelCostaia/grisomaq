@@ -12,7 +12,8 @@
     "test": "node --test \"tests/*.test.mjs\"",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "criar-usuario": "node scripts/criar-usuario.mjs"
+    "criar-usuario": "node scripts/criar-usuario.mjs",
+    "backup": "node scripts/backup.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^11.10.0",
