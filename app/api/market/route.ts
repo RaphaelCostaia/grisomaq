@@ -150,10 +150,12 @@ function parseFutures(definition: (typeof definitions)[number], quoteResult: Fet
   const unitMatch = block.match(/Fechamento \(([^)]+)\)/);
   const unit = unitMatch?.[1]?.replace("US$", "US$") ?? definition.unit;
   const rows: FutureContract[] = [];
+  const seen = new Set<string>();
   const pattern = /([A-Za-zÀ-ÿçÇ]+\/\d{4})\s+([0-9.]+,[0-9]+)\s+([+-]?[0-9.,]+|-)/g;
   for (const match of block.matchAll(pattern)) {
     const value = ptNumber(match[2]);
-    if (value === null || value <= 0) continue;
+    if (value === null || value <= 0 || seen.has(match[1])) continue;
+    seen.add(match[1]);
     rows.push({
       commodity: definition.id,
       contract: match[1],

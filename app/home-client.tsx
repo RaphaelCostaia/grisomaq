@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppSidebar } from "./components/AppSidebar";
 import { Modal } from "./components/Modal";
 import {
@@ -172,11 +172,19 @@ export default function Home() {
     }
   }, []);
 
+  // Guarda o updatedAt atual num ref para o efeito de polling lê-lo sem que ele
+  // vire dependência (senão o efeito re-executaria a cada consulta → refetch em loop).
+  const updatedAtRef = useRef("");
+  useEffect(() => {
+    updatedAtRef.current = data.updatedAt;
+  }, [data.updatedAt]);
+
   useEffect(() => {
     const startup = window.setTimeout(() => void refreshData(true), 0);
     const interval = window.setInterval(() => void refreshData(true), 10 * 60 * 1000);
     const onVisible = () => {
-      if (document.visibilityState === "visible" && data.updatedAt && Date.now() - Date.parse(data.updatedAt) >= 10 * 60 * 1000) {
+      const updatedAt = updatedAtRef.current;
+      if (document.visibilityState === "visible" && updatedAt && Date.now() - Date.parse(updatedAt) >= 10 * 60 * 1000) {
         void refreshData(true);
       }
     };
@@ -186,7 +194,7 @@ export default function Home() {
       window.clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refreshData, data.updatedAt]);
+  }, [refreshData]);
 
   useEffect(() => {
     const startup = window.setTimeout(() => {
@@ -385,9 +393,9 @@ export default function Home() {
           <article className="panel simulator-panel">
             <div className="panel-head"><div><span className="section-kicker">Simulador de margem</span><h2>Teste uma proteção parcial</h2></div><span className="calculator-badge">Cenário</span></div>
             <div className="simulator-fields">
-              <label>Volume<input type="number" min="0" value={volume} onChange={(event) => setVolume(Math.max(0, Number(event.target.value)))} /></label>
-              <label>Custo por unidade<input type="number" min="0" step="0.01" value={unitCost} onChange={(event) => setUnitCost(Math.max(0, Number(event.target.value)))} /></label>
-              <label>Frete por unidade<input type="number" min="0" step="0.01" value={freight} onChange={(event) => setFreight(Math.max(0, Number(event.target.value)))} /></label>
+              <label>Volume<input type="number" min="0" value={volume} onChange={(event) => setVolume(Math.max(0, Math.floor(Number(event.target.value) || 0)))} /></label>
+              <label>Custo por unidade<input type="number" min="0" step="0.01" value={unitCost} onChange={(event) => setUnitCost(Math.max(0, Number(event.target.value) || 0))} /></label>
+              <label>Frete por unidade<input type="number" min="0" step="0.01" value={freight} onChange={(event) => setFreight(Math.max(0, Number(event.target.value) || 0))} /></label>
               <label>Parcela protegida<select value={protectedShare} onChange={(event) => setProtectedShare(Number(event.target.value))}><option value={0}>0%</option><option value={20}>20%</option><option value={30}>30%</option><option value={50}>50%</option><option value={70}>70%</option></select></label>
             </div>
             <div className="simulation-results">
