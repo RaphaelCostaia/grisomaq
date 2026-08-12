@@ -15,6 +15,7 @@ export const NAV_ITEMS: NavItem[] = [
   { hash: "recomendacoes", label: "Recomendações", icon: "◎" },
   { hash: "operacoes", label: "Futuros e simulador", icon: "⇄" },
   { hash: "radar", label: "Alertas e notícias", icon: "▤" },
+  { hash: "anotacoes", label: "Anotações", icon: "✎" },
   { hash: "fontes", label: "Fontes", icon: "◇" },
   { href: "/noticias", label: "Central de notícias", icon: "▦" },
   { href: "/relatorios", label: "Relatórios", icon: "▧" },

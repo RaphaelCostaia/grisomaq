@@ -289,6 +289,18 @@ textarea { padding: 10px; resize: vertical; }
 .targets-list li button:hover { color: #ff9b9b; border-color: rgba(255,107,107,.4); }
 .modal-actions { margin-top: 18px; display: flex; justify-content: flex-end; gap: 9px; }
 
+/* Anotações do usuário */
+.notes-form { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.notes-form textarea { width: 100%; resize: vertical; min-height: 64px; padding: 11px 13px; border: 1px solid var(--border-soft); border-radius: 10px; background: #0d1512; color: #e6efe9; font: inherit; font-size: 13px; line-height: 1.5; }
+.notes-form textarea:focus { outline: none; border-color: var(--green); }
+.notes-form .primary-button { align-self: flex-end; }
+.notes-list { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 8px; }
+.notes-list li { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 11px 13px; border: 1px solid var(--border-soft); border-radius: 10px; background: #0b1210; }
+.notes-list time { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+.notes-list p { margin: 0; color: #d4dfd9; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+.notes-list li button { flex: 0 0 auto; width: 24px; height: 24px; border: 1px solid var(--border-soft); border-radius: 7px; background: transparent; color: #8aa; cursor: pointer; line-height: 1; }
+.notes-list li button:hover { color: #ff9b9b; border-color: rgba(255,107,107,.4); }
+
 /* News and report workspaces */
 .subpage-shell { min-height: 100vh; padding: 24px clamp(18px, 4vw, 56px) 48px; background: radial-gradient(circle at 82% -10%, rgba(95,226,154,.08), transparent 32%), var(--bg); }
 .subpage-header { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 22px; border-bottom: 1px solid var(--border-soft); }

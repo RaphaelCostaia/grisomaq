@@ -25,6 +25,7 @@ import type {
 type PeriodDays = 7 | 30 | 90;
 type AlertPreferences = { price: boolean; basis: boolean; news: boolean; source: boolean };
 type PriceTarget = { commodity: CommodityId; direction: "above" | "below"; value: number };
+type Note = { id: number; commodity: CommodityId; body: string; createdAt: string };
 
 const TARGETS_KEY = "grisomaq-price-targets-v1";
 
@@ -162,6 +163,10 @@ export default function Home() {
   const [unitCost, setUnitCost] = useState(52);
   const [freight, setFreight] = useState(3.5);
   const [protectedShare, setProtectedShare] = useState(30);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesSaving, setNotesSaving] = useState(false);
 
   const refreshData = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
@@ -225,8 +230,22 @@ export default function Home() {
     return () => window.clearTimeout(startup);
   }, []);
 
+  // Anotações do usuário (privadas, no servidor) para a commodity ativa.
   useEffect(() => {
-    const sections = ["visao-geral", "cotacoes", "recomendacoes", "operacoes", "radar", "fontes"]
+    let cancelled = false;
+    const startup = window.setTimeout(() => {
+      setNotesLoading(true);
+      fetch(`/api/notes?commodity=${activeCommodity}`, { cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : { notes: [] }))
+        .then((result) => { if (!cancelled) setNotes(Array.isArray(result.notes) ? result.notes : []); })
+        .catch(() => { if (!cancelled) setNotes([]); })
+        .finally(() => { if (!cancelled) setNotesLoading(false); });
+    }, 0);
+    return () => { cancelled = true; window.clearTimeout(startup); };
+  }, [activeCommodity]);
+
+  useEffect(() => {
+    const sections = ["visao-geral", "cotacoes", "recomendacoes", "operacoes", "radar", "anotacoes", "fontes"]
       .map((id) => document.getElementById(id))
       .filter((section): section is HTMLElement => Boolean(section));
     const observer = new IntersectionObserver((entries) => {
@@ -332,6 +351,43 @@ export default function Home() {
 
   function removeTarget(target: PriceTarget) {
     persistTargets(targets.filter((t) => !(t.commodity === target.commodity && t.direction === target.direction && t.value === target.value)));
+  }
+
+  async function addNoteEntry() {
+    const text = noteDraft.trim();
+    if (!text || notesSaving) return;
+    setNotesSaving(true);
+    try {
+      const response = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commodity: activeCommodity, body: text }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (response.ok && result.note) {
+        setNotes((current) => [result.note as Note, ...current]);
+        setNoteDraft("");
+      } else {
+        setToast(result?.error ?? "Não foi possível salvar a anotação.");
+      }
+    } catch {
+      setToast("Falha de conexão ao salvar a anotação.");
+    } finally {
+      setNotesSaving(false);
+    }
+  }
+
+  async function removeNoteEntry(id: number) {
+    setNotes((current) => current.filter((note) => note.id !== id));
+    try {
+      await fetch("/api/notes", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch {
+      // Se falhar, a próxima troca de commodity recarrega a lista real do servidor.
+    }
   }
 
   function saveAlertPreferences() {
@@ -501,6 +557,36 @@ export default function Home() {
           {regional.length ? <div className="regional-grid">{regional.map((quote) => (
             <div className="regional-card" key={`${quote.commodity}-${quote.location}`}><div><span>{quote.state ?? "BR"}</span><strong>{quote.location}</strong></div><b>R$ {formatMoney(quote.value)}</b><small>{quote.source} · {quote.reference}</small></div>
           ))}</div> : <div className="empty-state">Nenhuma praça regional foi validada para esta commodity.</div>}
+        </section>
+
+        <section className="notes-panel panel" id="anotacoes" aria-labelledby="notes-title">
+          <div className="panel-head"><div><span className="section-kicker">Diário do usuário</span><h2 id="notes-title">Minhas anotações de {activeMarket?.name.toLowerCase() ?? "mercado"}</h2></div><span className="data-delay">Privado — só você vê</span></div>
+          <div className="notes-form">
+            <textarea
+              value={noteDraft}
+              onChange={(event) => setNoteDraft(event.target.value)}
+              onKeyDown={(event) => { if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) void addNoteEntry(); }}
+              placeholder={`Ex.: vendi 100 sc a ${activeMarket?.value ? formatMoney(activeMarket.value) : "65,00"}; esperar subir pra proteger o restante.`}
+              maxLength={2000}
+              rows={3}
+              aria-label="Nova anotação"
+            />
+            <button type="button" className="primary-button" onClick={() => void addNoteEntry()} disabled={!noteDraft.trim() || notesSaving}>{notesSaving ? "Salvando…" : "Adicionar"}</button>
+          </div>
+          {notesLoading ? (
+            <div className="empty-state">Carregando anotações…</div>
+          ) : notes.length ? (
+            <ul className="notes-list">
+              {notes.map((note) => (
+                <li key={note.id}>
+                  <div><time>{formatDateTime(note.createdAt)}</time><p>{note.body}</p></div>
+                  <button type="button" onClick={() => void removeNoteEntry(note.id)} aria-label="Remover anotação">×</button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="empty-state">Nenhuma anotação de {activeMarket?.name.toLowerCase() ?? "mercado"} ainda. Registre suas decisões aqui.</div>
+          )}
         </section>
 
         <section className="sources-panel" id="fontes" aria-labelledby="sources-title">
