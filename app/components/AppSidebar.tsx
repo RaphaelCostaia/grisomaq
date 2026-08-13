@@ -43,6 +43,19 @@ function scrollToSection(event: MouseEvent<HTMLAnchorElement>, hash: string) {
   history.replaceState(null, "", `#${hash}`);
 }
 
+// Alterna claro/escuro e persiste; o tema aplica antes da pintura via script no layout.
+function toggleTheme() {
+  const root = document.documentElement;
+  const next = root.dataset.theme === "light" ? "" : "light";
+  if (next) root.dataset.theme = next;
+  else delete root.dataset.theme;
+  try {
+    localStorage.setItem("grisomaq-theme", next || "dark");
+  } catch {
+    // sem armazenamento: o tema vale só para esta visita
+  }
+}
+
 async function logout() {
   try {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -179,6 +192,7 @@ export function AppSidebar({ data, activeSection }: { data: MarketResponse | nul
         <p>Físico, futuro, câmbio e fundamentos com origem e horário identificados.</p>
         <div className="profile"><span>DR</span><div><strong>Diretoria</strong><small>Grisomaq</small></div></div>
         <div className="sidebar-account">
+          <button type="button" className="sidebar-account-btn" onClick={toggleTheme}><span aria-hidden="true">◐</span> Tema claro/escuro</button>
           <button type="button" className="sidebar-account-btn" onClick={() => setPasswordOpen(true)}><span aria-hidden="true">⚿</span> Trocar senha</button>
           <button type="button" className="sidebar-logout" onClick={() => void logout()}><span aria-hidden="true">⏻</span> Sair</button>
         </div>

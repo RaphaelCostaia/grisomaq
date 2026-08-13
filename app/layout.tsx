@@ -33,6 +33,14 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// Aplica o tema salvo ANTES da pintura (evita flash claro/escuro no carregamento).
+const themeInit = "try{if(localStorage.getItem('grisomaq-theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}";
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="pt-BR"><body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body></html>;
+  return (
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeInit }} /></head>
+      <body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body>
+    </html>
+  );
 }
