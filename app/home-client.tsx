@@ -223,6 +223,8 @@ export default function Home() {
   const [noteDraft, setNoteDraft] = useState("");
   const [notesLoading, setNotesLoading] = useState(false);
   const [notesSaving, setNotesSaving] = useState(false);
+  const [simHint, setSimHint] = useState("");
+  const simHintTimer = useRef<number | null>(null);
 
   const refreshData = useCallback(async (silent = false) => {
     if (!silent) setRefreshing(true);
@@ -443,6 +445,15 @@ export default function Home() {
     setToast(`Alvo salvo: ${commodityLabel(targetCommodity)} ${targetDirection === "above" ? "≥" : "≤"} R$ ${formatMoney(value)}.`);
   }
 
+  // Feedback quando o usuário digita um "-" no simulador: o filtro continua
+  // descartando o caractere, mas agora avisa em vez de mudar o valor em silêncio.
+  function flagNegativeAttempt(raw: string) {
+    if (!/[-−]/.test(raw)) return;
+    setSimHint("O simulador usa apenas valores positivos — o sinal de menos foi ignorado.");
+    if (simHintTimer.current) window.clearTimeout(simHintTimer.current);
+    simHintTimer.current = window.setTimeout(() => setSimHint(""), 4000);
+  }
+
   function removeTarget(target: PriceTarget) {
     persistTargets(targets.filter((t) => !(t.commodity === target.commodity && t.direction === target.direction && t.value === target.value)));
   }
@@ -625,11 +636,12 @@ export default function Home() {
           <article className="panel simulator-panel">
             <div className="panel-head"><div><span className="section-kicker">Simulador de margem</span><h2>Teste uma proteção parcial</h2></div><span className="calculator-badge">Cenário</span></div>
             <div className="simulator-fields">
-              <label>Volume<input type="text" inputMode="numeric" value={volumeDraft} onChange={(event) => { const s = sanitizeIntInput(event.target.value); setVolumeDraft(s.draft); setVolume(s.value); }} /></label>
-              <label>Custo por unidade<input type="text" inputMode="decimal" value={unitCostDraft} onChange={(event) => { const s = sanitizeDecimalInput(event.target.value); setUnitCostDraft(s.draft); setUnitCost(s.value); }} /></label>
-              <label>Frete por unidade<input type="text" inputMode="decimal" value={freightDraft} onChange={(event) => { const s = sanitizeDecimalInput(event.target.value); setFreightDraft(s.draft); setFreight(s.value); }} /></label>
+              <label>Volume<input type="text" inputMode="numeric" value={volumeDraft} onChange={(event) => { flagNegativeAttempt(event.target.value); const s = sanitizeIntInput(event.target.value); setVolumeDraft(s.draft); setVolume(s.value); }} /></label>
+              <label>Custo por unidade<input type="text" inputMode="decimal" value={unitCostDraft} onChange={(event) => { flagNegativeAttempt(event.target.value); const s = sanitizeDecimalInput(event.target.value); setUnitCostDraft(s.draft); setUnitCost(s.value); }} /></label>
+              <label>Frete por unidade<input type="text" inputMode="decimal" value={freightDraft} onChange={(event) => { flagNegativeAttempt(event.target.value); const s = sanitizeDecimalInput(event.target.value); setFreightDraft(s.draft); setFreight(s.value); }} /></label>
               <label>Parcela protegida<select value={protectedShare} onChange={(event) => setProtectedShare(Number(event.target.value))}><option value={0}>0%</option><option value={20}>20%</option><option value={30}>30%</option><option value={50}>50%</option><option value={70}>70%</option></select></label>
             </div>
+            {simHint && <p className="sim-hint" role="status">{simHint}</p>}
             <div className="simulation-results">
               <div><small>Margem no físico</small><strong>{currentMargin === null ? "—" : `R$ ${formatMoney(currentMargin)}`}</strong></div>
               <div><small>Cenário combinado</small><strong>{simulatedMargin === null || !activeFuture ? "Não comparável" : `R$ ${formatMoney(simulatedMargin)}`}</strong></div>
@@ -659,7 +671,7 @@ export default function Home() {
               {topNews.length ? topNews.map((item) => (
                 <a className="news-row" key={item.id} href={item.href} target="_blank" rel="noreferrer">
                   <span className={`news-tag ${item.tag.toLowerCase()}`}>{item.tag}</span>
-                  <span><strong>{item.title}</strong><small>{item.source}{item.publishedAt ? ` · ${item.publishedAt}` : " · consulta atual"}</small></span>
+                  <span><strong>{item.title}</strong><small>{item.source}{item.publishedAt ? ` · publicada em ${item.publishedAt}` : data.updatedAt ? ` · consultada ${formatDateTime(data.updatedAt)}` : " · consulta atual"}</small></span>
                   <em className={`impact-badge ${item.impact}`}>{item.impact === "high" ? "alto" : item.impact === "medium" ? "médio" : "baixo"}</em>
                 </a>
               )) : <div className="empty-state">As fontes editoriais não responderam nesta consulta.</div>}

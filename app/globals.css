@@ -251,6 +251,7 @@ a.table-row:hover { background: rgba(95,226,154,.025); }
 .table-row small { color: var(--faint); font-size: 11px; }
 .table-head { min-height: 29px; border-top: 0; color: var(--faint); text-transform: uppercase; letter-spacing: .07em; font-size: 11px; }
 .simulator-fields { margin-top: 14px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.sim-hint { margin: 8px 0 0; padding: 7px 10px; border: 1px solid rgba(217,182,95,.3); border-radius: 8px; background: rgba(217,182,95,.08); color: var(--gold); font-size: 12px; }
 .simulator-fields label, .report-field { display: grid; gap: 6px; color: var(--faint); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
 input, select, textarea { min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-soft); color: var(--text-2); }
 input, select { height: 36px; padding: 0 10px; }

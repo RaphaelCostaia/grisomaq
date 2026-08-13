@@ -104,7 +104,9 @@ export default function NewsPage() {
       const key = newsDateKey(item);
       const last = groups.at(-1);
       if (last && last.key === key) last.items.push(item);
-      else groups.push({ key, label: key === "atual" ? "Consulta atual" : key, items: [item] });
+      // A capa da fonte não publica horário na listagem; o que sabemos com certeza
+      // é o momento da consulta — o rótulo diz exatamente isso.
+      else groups.push({ key, label: key === "atual" ? "Manchetes da capa (consulta atual)" : `Publicadas em ${key}`, items: [item] });
     }
     return groups;
   }, [filtered]);
@@ -153,7 +155,7 @@ export default function NewsPage() {
                 <h2>{item.title}</h2>
                 {item.summary && <p>{item.summary}</p>}
                 <div className="impact-explanation">{item.impactReason}</div>
-                <div className="news-card-meta"><span>{item.source}</span><span>{item.publishedAt ?? "Consulta atual"}</span></div>
+                <div className="news-card-meta"><span>{item.source}</span><span>{item.publishedAt ? `publicada em ${item.publishedAt}` : data?.updatedAt ? `consultada ${formatDateTime(data.updatedAt)}` : "consulta atual"}</span></div>
                 <div className="news-card-actions"><button className={`favorite-button ${favorites.includes(item.id) ? "is-active" : ""}`} onClick={() => toggleFavorite(item)}>{favorites.includes(item.id) ? "★ Favorita" : "☆ Favoritar"}</button><a className="primary-button" href={item.href} target="_blank" rel="noreferrer">Abrir original ↗</a></div>
               </article>
             ))}
