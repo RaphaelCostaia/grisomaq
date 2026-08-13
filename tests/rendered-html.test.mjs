@@ -26,14 +26,19 @@ test("dashboard exposes the executive workspaces and refresh policy", async () =
 });
 
 test("market API uses traceable public inputs and never a fixed price fallback", async () => {
-  const api = await source("app/api/market/route.ts");
+  // A coleta dos indicadores físicos vive em lib/market-collect.ts (compartilhada
+  // com o coletor agendado); a rota mantém câmbio, Conab e a resposta ao vivo.
+  const [api, collect] = await Promise.all([
+    source("app/api/market/route.ts"),
+    source("lib/market-collect.ts"),
+  ]);
 
   assert.match(api, /olinda\.bcb\.gov\.br/);
-  assert.match(api, /noticiasagricolas\.com\.br/);
+  assert.match(collect, /noticiasagricolas\.com\.br/);
   assert.match(api, /gov\.br\/conab/);
-  assert.match(api, /persistMarketSnapshots/);
+  assert.match(collect, /persistMarketSnapshots/);
   assert.match(api, /s-maxage=600/);
-  assert.doesNotMatch(api, /64\.64|140\.63|328\.10|INITIAL_MARKETS|TREND_DATA/);
+  assert.doesNotMatch(api + collect, /64\.64|140\.63|328\.10|INITIAL_MARKETS|TREND_DATA/);
 });
 
 test("snapshot migration preserves a unique observed market record", async () => {
