@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type MouseEvent } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { Modal } from "./Modal";
 import type { MarketResponse } from "../../lib/market-types";
 
@@ -29,8 +29,8 @@ export const NAV_ITEMS: NavItem[] = [
 export function headerOffset(): number {
   const mobile = window.matchMedia("(max-width: 900px)").matches;
   if (!mobile) return 20;
-  const bar = document.querySelector(".sidebar");
-  return (bar ? bar.getBoundingClientRect().height : 118) + 8;
+  const bar = document.querySelector(".mobile-topbar");
+  return (bar ? bar.getBoundingClientRect().height : 56) + 8;
 }
 
 function scrollToSection(event: MouseEvent<HTMLAnchorElement>, hash: string) {
@@ -58,12 +58,37 @@ export function AppSidebar({ data, activeSection }: { data: MarketResponse | nul
   const responding = data ? data.sources.filter((source) => source.status !== "unavailable").length : 0;
   const mode = data?.mode ?? "unavailable";
 
+  const [menuOpen, setMenuOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [feedback, setFeedback] = useState<{ type: "ok" | "error"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Fecha o drawer ao trocar de rota (clicar numa subpágina / back-forward).
+  useEffect(() => {
+    const t = window.setTimeout(() => setMenuOpen(false), 0);
+    return () => window.clearTimeout(t);
+  }, [pathname]);
+
+  // Enquanto o drawer está aberto: trava a rolagem do fundo e fecha com Esc.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = original;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  const activeItem = isHome
+    ? NAV_ITEMS.find((item) => "hash" in item && item.hash === activeSection)
+    : NAV_ITEMS.find((item) => "href" in item && item.href === pathname);
+  const currentLabel = activeItem?.label ?? "Painel de decisão";
 
   function closePassword() {
     setPasswordOpen(false);
@@ -109,8 +134,21 @@ export function AppSidebar({ data, activeSection }: { data: MarketResponse | nul
   }
 
   return (
-    <aside className="sidebar" aria-label="Navegação principal">
-      <Link href="/" className="brand" aria-label="Grisomaq Inteligência de Mercado">
+    <>
+      <header className="mobile-topbar">
+        <Link href="/" className="mobile-brand" aria-label="Grisomaq Inteligência de Mercado">
+          <span className="brand-mark" aria-hidden="true">G</span>
+        </Link>
+        <span className="mobile-section">{currentLabel}</span>
+        <button type="button" className="mobile-menu-btn" aria-label={menuOpen ? "Fechar menu" : "Abrir menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
+          <span aria-hidden="true">{menuOpen ? "✕" : "☰"}</span>
+        </button>
+      </header>
+
+      {menuOpen && <div className="drawer-backdrop" role="presentation" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={`sidebar ${menuOpen ? "is-open" : ""}`} aria-label="Navegação principal">
+      <Link href="/" className="brand" aria-label="Grisomaq Inteligência de Mercado" onClick={() => setMenuOpen(false)}>
         <span className="brand-mark" aria-hidden="true">G</span>
         <span><strong>GRISOMAQ</strong><small>Inteligência de Mercado</small></span>
       </Link>
@@ -119,18 +157,18 @@ export function AppSidebar({ data, activeSection }: { data: MarketResponse | nul
           if ("hash" in item) {
             const active = isHome && activeSection === item.hash;
             return isHome ? (
-              <a key={item.hash} className={`nav-item ${active ? "is-active" : ""}`} href={`#${item.hash}`} onClick={(event) => scrollToSection(event, item.hash)} aria-current={active ? "page" : undefined}>
+              <a key={item.hash} className={`nav-item ${active ? "is-active" : ""}`} href={`#${item.hash}`} onClick={(event) => { scrollToSection(event, item.hash); setMenuOpen(false); }} aria-current={active ? "page" : undefined}>
                 <span aria-hidden="true">{item.icon}</span>{item.label}
               </a>
             ) : (
-              <Link key={item.hash} className="nav-item" href={`/#${item.hash}`}>
+              <Link key={item.hash} className="nav-item" href={`/#${item.hash}`} onClick={() => setMenuOpen(false)}>
                 <span aria-hidden="true">{item.icon}</span>{item.label}
               </Link>
             );
           }
           const active = pathname === item.href;
           return (
-            <Link key={item.href} className={`nav-item ${active ? "is-active" : ""}`} href={item.href} aria-current={active ? "page" : undefined}>
+            <Link key={item.href} className={`nav-item ${active ? "is-active" : ""}`} href={item.href} onClick={() => setMenuOpen(false)} aria-current={active ? "page" : undefined}>
               <span aria-hidden="true">{item.icon}</span>{item.label}
             </Link>
           );
@@ -159,6 +197,7 @@ export function AppSidebar({ data, activeSection }: { data: MarketResponse | nul
           <div className="modal-actions"><button className="secondary-button" onClick={closePassword}>Fechar</button><button className="primary-button" onClick={() => void submitPassword()} disabled={saving}>{saving ? "Salvando…" : "Salvar nova senha"}</button></div>
         </Modal>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }

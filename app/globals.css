@@ -28,6 +28,13 @@ a { color: inherit; text-decoration: none; }
 
 .app-shell { min-height: 100vh; background: radial-gradient(circle at 72% -12%, rgba(95,226,154,.07), transparent 30%), var(--bg); }
 .sidebar { position: fixed; inset: 0 auto 0 0; width: 240px; padding: 27px 18px 20px; display: flex; flex-direction: column; border-right: 1px solid var(--border-soft); background: rgba(10,16,14,.97); z-index: 30; }
+/* Cabeçalho compacto + drawer: só no mobile (escondidos no desktop). */
+.mobile-topbar { display: none; }
+.drawer-backdrop { display: none; }
+.mobile-brand { display: inline-flex; align-items: center; }
+.mobile-section { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 650; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mobile-menu-btn { flex: 0 0 auto; width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 10px; background: transparent; color: var(--text); font-size: 17px; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .sidebar { transition: none; } }
 .brand { display: flex; align-items: center; gap: 12px; padding: 0 8px 29px; }
 .brand-mark { width: 39px; height: 39px; flex: 0 0 39px; display: grid; place-items: center; border: 1px solid rgba(95,226,154,.45); border-radius: 10px; background: linear-gradient(145deg, rgba(95,226,154,.2), rgba(217,182,95,.08)); color: var(--green); font-weight: 800; box-shadow: inset 0 0 18px rgba(95,226,154,.08); }
 .brand strong { display: block; letter-spacing: .14em; font-size: 15.5px; }
@@ -401,17 +408,19 @@ textarea { padding: 10px; resize: vertical; }
 }
 
 @media (max-width: 900px) {
-  .sidebar { position: sticky; inset: 0 auto auto 0; width: auto; height: auto; padding: 12px 18px 9px; border-right: 0; border-bottom: 1px solid var(--border-soft); backdrop-filter: blur(12px); }
-  .brand { padding-bottom: 11px; }
-  .brand-mark { width: 33px; height: 33px; flex-basis: 33px; }
-  .nav-list { display: flex; overflow-x: auto; padding-bottom: 3px; -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent); mask-image: linear-gradient(90deg, #000 86%, transparent); }
-  .nav-item { width: auto; min-height: 36px; white-space: nowrap; flex: 0 0 auto; }
-  .nav-item.is-active { box-shadow: inset 0 -2px var(--green), 0 0 0 1px rgba(95,226,154,.05); }
-  .sidebar-foot { margin-top: 8px; }
-  .sidebar-foot > p, .profile { display: none; }
+  .mobile-topbar { display: flex; position: fixed; top: 0; left: 0; right: 0; height: 56px; align-items: center; gap: 12px; padding: 0 14px; background: rgba(10,16,14,.98); border-bottom: 1px solid var(--border-soft); backdrop-filter: blur(10px); z-index: 65; }
+  .drawer-backdrop { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(2,5,4,.6); backdrop-filter: blur(2px); }
+  .sidebar { position: fixed; inset: 0 auto 0 0; width: min(84vw, 320px); height: 100%; padding: 64px 16px 20px; transform: translateX(-100%); transition: transform .24s ease; border-right: 1px solid var(--border-soft); box-shadow: 0 0 46px rgba(0,0,0,.55); background: var(--sidebar); z-index: 60; overflow-y: auto; overscroll-behavior: contain; }
+  .sidebar.is-open { transform: translateX(0); }
+  .sidebar > .brand { display: none; }
+  .nav-list { display: grid; overflow: visible; padding-bottom: 0; -webkit-mask-image: none; mask-image: none; }
+  .nav-item { width: 100%; min-height: 44px; white-space: normal; flex: initial; }
+  .nav-item.is-active { box-shadow: inset 2px 0 var(--green), 0 0 0 1px rgba(95,226,154,.05); }
+  .sidebar-foot { margin-top: 14px; }
+  .sidebar-foot > p { display: none; }
   .source-mini { font-size: 12.5px; }
-  .workspace { margin-left: 0; padding: 0 18px 24px; }
-  .topbar, #cotacoes, #recomendacoes, #operacoes, #radar, #anotacoes, #fontes { scroll-margin-top: 118px; }
+  .workspace { margin-left: 0; padding: 72px 16px 28px; }
+  .topbar, #cotacoes, #recomendacoes, #operacoes, #radar, #anotacoes, #fontes { scroll-margin-top: 72px; }
   .decision-grid, .operations-grid, .lower-grid { grid-template-columns: 1fr; }
   .recommendation-card h2 { max-width: none; }
   .briefing { grid-template-columns: 1fr auto; }
