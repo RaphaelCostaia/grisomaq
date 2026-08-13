@@ -230,6 +230,18 @@ export default function Home() {
     return () => window.clearTimeout(startup);
   }, []);
 
+  // Ao abrir a home com hash (ex.: "/#fontes" vindo de uma subpágina, ou reload),
+  // rola até a seção — a âncora nativa não move o document neste layout.
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const startup = window.setTimeout(() => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      document.getElementById(hash)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    }, 200);
+    return () => window.clearTimeout(startup);
+  }, []);
+
   // Anotações do usuário (privadas, no servidor) para a commodity ativa.
   useEffect(() => {
     let cancelled = false;

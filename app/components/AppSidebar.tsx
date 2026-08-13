@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { Modal } from "./Modal";
 import type { MarketResponse } from "../../lib/market-types";
 
@@ -20,6 +20,18 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/noticias", label: "Central de notícias", icon: "▦" },
   { href: "/relatorios", label: "Relatórios", icon: "▧" },
 ];
+
+// Rolagem programática até a seção: a âncora nativa não move o document neste
+// layout (sidebar fixa + hidratação), então rolamos explicitamente e refletimos a
+// URL sem novo salto. Mesmo padrão de selectCommodity em home-client.
+function scrollToSection(event: MouseEvent<HTMLAnchorElement>, hash: string) {
+  const target = document.getElementById(hash);
+  if (!target) return;
+  event.preventDefault();
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  history.replaceState(null, "", `#${hash}`);
+}
 
 async function logout() {
   try {
@@ -97,7 +109,7 @@ export function AppSidebar({ data, activeSection }: { data: MarketResponse | nul
           if ("hash" in item) {
             const active = isHome && activeSection === item.hash;
             return isHome ? (
-              <a key={item.hash} className={`nav-item ${active ? "is-active" : ""}`} href={`#${item.hash}`} aria-current={active ? "page" : undefined}>
+              <a key={item.hash} className={`nav-item ${active ? "is-active" : ""}`} href={`#${item.hash}`} onClick={(event) => scrollToSection(event, item.hash)} aria-current={active ? "page" : undefined}>
                 <span aria-hidden="true">{item.icon}</span>{item.label}
               </a>
             ) : (
