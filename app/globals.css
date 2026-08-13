@@ -90,6 +90,24 @@ a { color: inherit; text-decoration: none; }
 .briefing-score { border-left: 1px solid rgba(217,182,95,.2); padding-left: 22px; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .briefing-score b { color: var(--gold); font-size: 22px; margin-right: 5px; }
 
+/* Decisão de hoje — veredito por commodity (topo do painel) */
+.decision-board { margin: 20px 0 8px; }
+.decision-board-head { margin-bottom: 12px; }
+.decision-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.decision-card { text-align: left; border: 1px solid var(--border-soft); border-left: 4px solid var(--border); border-radius: 12px; padding: 15px; background: var(--panel); color: var(--text); cursor: pointer; display: grid; gap: 10px; min-height: 128px; transition: transform .15s ease, border-color .18s ease; }
+.decision-card:hover { transform: translateY(-2px); }
+.decision-card-top { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 650; }
+.decision-action { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; letter-spacing: .01em; }
+.decision-value { display: flex; align-items: baseline; gap: 10px; }
+.decision-value strong { font-size: 23px; letter-spacing: -.02em; }
+.decision-card p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.decision-card.action-proteger { border-left-color: var(--gold); }
+.decision-card.action-proteger .decision-action { background: rgba(217,182,95,.15); color: var(--gold); }
+.decision-card.action-acompanhar { border-left-color: var(--green); }
+.decision-card.action-acompanhar .decision-action { background: rgba(95,226,154,.15); color: var(--green); }
+.decision-card.action-aguardar { border-left-color: var(--blue); }
+.decision-card.action-aguardar .decision-action { background: rgba(101,185,245,.15); color: var(--blue); }
+
 .market-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .market-card { min-height: 139px; padding: 15px 16px 14px; min-width: 0; border: 1px solid var(--border-soft); border-radius: 12px; background: linear-gradient(155deg, #111a16, #0d1512); color: var(--text); text-align: left; }
 button.market-card, a.market-card { cursor: pointer; transition: border .18s ease, transform .18s ease, background .18s ease; }
@@ -422,6 +440,7 @@ textarea { padding: 10px; resize: vertical; }
   .workspace { margin-left: 0; padding: 72px 16px 28px; }
   .topbar, #cotacoes, #recomendacoes, #operacoes, #radar, #anotacoes, #fontes { scroll-margin-top: 72px; }
   .decision-grid, .operations-grid, .lower-grid { grid-template-columns: 1fr; }
+  .decision-cards { grid-template-columns: 1fr; }
   .recommendation-card h2 { max-width: none; }
   .briefing { grid-template-columns: 1fr auto; }
   .briefing > p { grid-column: 1 / -1; grid-row: 2; }

@@ -323,6 +323,11 @@ export default function Home() {
     () => activeMarket ? buildDecisionSignal(activeMarket, data.futures, data.news, data.currency) : null,
     [activeMarket, data.futures, data.news, data.currency],
   );
+  // Veredito por commodity para o bloco "Decisão de hoje" (topo do painel).
+  const decisionBoard = useMemo(
+    () => data.markets.map((market) => ({ market, signal: buildDecisionSignal(market, data.futures, data.news, data.currency) })),
+    [data.markets, data.futures, data.news, data.currency],
+  );
   const allAlerts = useMemo(() => buildAlerts(data.markets, data.futures, data.news, data.currency), [data.markets, data.futures, data.news, data.currency]);
   // Alertas de alvo definido pelo usuário: dispara quando o fechamento atual cruza o limite.
   const targetAlerts = useMemo<MarketAlert[]>(() => {
@@ -496,6 +501,20 @@ export default function Home() {
             <a href="#fontes">Ver fontes</a>
           </div>
         )}
+
+        <section className="decision-board" aria-label="Decisão de hoje">
+          <div className="decision-board-head"><span className="section-kicker">Decisão de hoje</span><h2>O que fazer em cada mercado</h2></div>
+          <div className="decision-cards">
+            {loading && [0, 1, 2].map((item) => <div className="decision-card skeleton-card" key={item} aria-hidden="true" />)}
+            {decisionBoard.map(({ market, signal: marketSignal }) => (
+              <button key={market.id} className={`decision-card action-${marketSignal.action}`} onClick={() => selectCommodity(market.id)} aria-label={`${market.name}: ${marketSignal.action}. ${marketSignal.summary}`}>
+                <div className="decision-card-top"><span className={`commodity-dot ${market.id}`} aria-hidden="true" />{market.name}<em className="decision-action">{marketSignal.action.charAt(0).toUpperCase() + marketSignal.action.slice(1)}</em></div>
+                <div className="decision-value"><strong>{market.value === null ? "—" : `R$ ${formatMoney(market.value)}`}</strong><span className={(market.change ?? 0) >= 0 ? "positive" : "negative"}>{formatPercent(market.change)}</span></div>
+                <p>{marketSignal.summary}</p>
+              </button>
+            ))}
+          </div>
+        </section>
 
         <section className="briefing" aria-labelledby="briefing-title">
           <div><span className="section-kicker">Briefing calculado</span><h2 id="briefing-title">O que exige atenção agora</h2></div>
