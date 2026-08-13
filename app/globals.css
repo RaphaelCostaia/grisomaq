@@ -146,8 +146,14 @@ button.market-card:hover, a.market-card:hover { transform: translateY(-1px); bor
 .trend-summary strong { font: 650 24px var(--font-geist-mono), monospace; letter-spacing: -.04em; }
 .trend-summary span { font-size: 12px; }
 .trend-summary small { margin-left: auto; color: #66786e; font-size: 11px; }
-.chart-wrap { margin-top: 5px; min-width: 0; }
-.chart-wrap svg { width: 100%; height: 225px; overflow: visible; }
+.chart-wrap { margin-top: 5px; min-width: 0; position: relative; }
+.chart-wrap svg { width: 100%; height: 225px; overflow: visible; cursor: crosshair; }
+.chart-guide { stroke: rgba(237,244,239,.35); stroke-width: 1; stroke-dasharray: 3 3; }
+.chart-axis-val { fill: #8fa198; font-size: 10px; }
+.chart-tooltip { position: absolute; top: 2px; transform: translateX(-50%); padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: rgba(10,16,14,.95); box-shadow: 0 8px 26px rgba(0,0,0,.4); pointer-events: none; white-space: nowrap; z-index: 5; }
+.chart-tooltip strong { display: block; color: var(--green); font-size: 13px; }
+.chart-tooltip span { color: var(--muted); font-size: 11px; }
+.chart-skeleton { min-height: 330px; }
 .chart-grid { stroke: #1c2a24; stroke-width: 1; }
 .chart-line { fill: none; stroke: var(--green); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .chart-dot { fill: var(--bg); stroke: var(--green); stroke-width: 3; }

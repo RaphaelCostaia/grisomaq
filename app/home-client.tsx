@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { AppSidebar, headerOffset } from "./components/AppSidebar";
 import { Modal } from "./components/Modal";
 import {
@@ -70,6 +70,8 @@ function visibleHistory(history: MarketPoint[], days: PeriodDays) {
 }
 
 function SeriesChart({ id, points, ariaLabel }: { id: string; points: MarketPoint[]; ariaLabel: string }) {
+  const [hover, setHover] = useState<number | null>(null);
+
   if (points.length < 2) {
     return (
       <div className="chart-empty" role="status">
@@ -85,17 +87,41 @@ function SeriesChart({ id, points, ariaLabel }: { id: string; points: MarketPoin
   const min = Math.min(...values);
   const max = Math.max(...values);
   const spread = Math.max(max - min, Math.max(max * 0.01, 1));
-  const polyline = points.map((point, index) => {
-    const x = 20 + (index / (points.length - 1)) * (width - 40);
-    const y = 20 + ((max - point.value) / spread) * (height - 55);
-    return `${x},${y}`;
-  }).join(" ");
-  const lastCoordinates = polyline.split(" ").at(-1)?.split(",") ?? [width - 20, height / 2];
+  const coords = points.map((point, index) => ({
+    x: 20 + (index / (points.length - 1)) * (width - 40),
+    y: 20 + ((max - point.value) / spread) * (height - 55),
+    point,
+  }));
+  const polyline = coords.map((c) => `${c.x},${c.y}`).join(" ");
+  const last = coords.at(-1)!;
   const area = `20,${height - 35} ${polyline} ${width - 20},${height - 35}`;
+  const active = hover !== null ? coords[hover] : null;
+
+  function handleMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const xInView = ((event.clientX - rect.left) / rect.width) * width;
+    let best = 0;
+    let bestDist = Infinity;
+    coords.forEach((c, index) => {
+      const dist = Math.abs(c.x - xInView);
+      if (dist < bestDist) { bestDist = dist; best = index; }
+    });
+    setHover(best);
+  }
+
+  const tipLeft = active ? Math.min(88, Math.max(12, (active.x / width) * 100)) : 0;
 
   return (
     <div className="chart-wrap">
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel}>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={ariaLabel}
+        onPointerMove={handleMove}
+        onPointerDown={handleMove}
+        onPointerLeave={() => setHover(null)}
+        style={{ touchAction: "pan-y" }}
+      >
         <defs>
           <linearGradient id={`chart-fill-${id}`} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#5fe29a" stopOpacity="0.25" />
@@ -105,8 +131,17 @@ function SeriesChart({ id, points, ariaLabel }: { id: string; points: MarketPoin
         {[50, 100, 150, 200].map((y) => <line key={y} x1="20" x2={width - 20} y1={y} y2={y} className="chart-grid" />)}
         <polygon points={area} fill={`url(#chart-fill-${id})`} />
         <polyline points={polyline} className="chart-line" />
-        <circle cx={Number(lastCoordinates[0])} cy={Number(lastCoordinates[1])} r="5" className="chart-dot" />
+        <text className="chart-axis-val" x={width - 4} y={16} textAnchor="end">R$ {formatMoney(max)}</text>
+        <text className="chart-axis-val" x={width - 4} y={height - 40} textAnchor="end">R$ {formatMoney(min)}</text>
+        {active && <line x1={active.x} x2={active.x} y1={14} y2={height - 35} className="chart-guide" />}
+        <circle cx={(active ?? last).x} cy={(active ?? last).y} r="5" className="chart-dot" />
       </svg>
+      {active && (
+        <div className="chart-tooltip" style={{ left: `${tipLeft}%` }} role="status">
+          <strong>R$ {formatMoney(active.point.value)}</strong>
+          <span>{active.point.date}</span>
+        </div>
+      )}
       <div className="chart-axis">
         <span>{points[0].date.slice(0, 5)}</span>
         <span>{points[Math.floor((points.length - 1) / 2)].date.slice(0, 5)}</span>
@@ -538,6 +573,13 @@ export default function Home() {
           </button>
         </section>
 
+
+        {loading && !activeMarket && (
+          <section className="decision-grid" aria-hidden="true">
+            <div className="panel skeleton-card chart-skeleton" />
+            <div className="panel skeleton-card chart-skeleton" />
+          </section>
+        )}
 
         {activeMarket && (
           <section className="decision-grid">
