@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppSidebar } from "./components/AppSidebar";
+import { AppSidebar, headerOffset } from "./components/AppSidebar";
 import { Modal } from "./components/Modal";
 import {
   buildAlerts,
@@ -141,6 +141,24 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
+// Entrada inteira: descarta não-dígitos (inclui "-") e zeros à esquerda → sem
+// negativos silenciosos nem "0500".
+function sanitizeIntInput(raw: string): { draft: string; value: number } {
+  const digits = raw.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  return { draft: digits, value: digits === "" ? 0 : Number(digits) };
+}
+
+// Entrada decimal: dígitos + um separador (vírgula vira ponto), sem negativos.
+function sanitizeDecimalInput(raw: string): { draft: string; value: number } {
+  let s = raw.replace(/,/g, ".").replace(/[^\d.]/g, "");
+  const dot = s.indexOf(".");
+  if (dot >= 0) s = s.slice(0, dot + 1) + s.slice(dot + 1).replace(/\./g, "");
+  s = s.replace(/^0+(?=\d)/, "");
+  if (s.startsWith(".")) s = `0${s}`;
+  const value = s === "" || s === "." ? 0 : Number(s);
+  return { draft: s, value: Number.isFinite(value) && value >= 0 ? value : 0 };
+}
+
 export default function Home() {
   const [data, setData] = useState<MarketResponse>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
@@ -160,8 +178,11 @@ export default function Home() {
   const [targetValue, setTargetValue] = useState("");
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [volume, setVolume] = useState(1000);
+  const [volumeDraft, setVolumeDraft] = useState("1000");
   const [unitCost, setUnitCost] = useState(52);
+  const [unitCostDraft, setUnitCostDraft] = useState("52");
   const [freight, setFreight] = useState(3.5);
+  const [freightDraft, setFreightDraft] = useState("3.5");
   const [protectedShare, setProtectedShare] = useState(30);
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteDraft, setNoteDraft] = useState("");
@@ -236,8 +257,11 @@ export default function Home() {
     const hash = window.location.hash.slice(1);
     if (!hash) return;
     const startup = window.setTimeout(() => {
+      const target = document.getElementById(hash);
+      if (!target) return;
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      document.getElementById(hash)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      const top = target.getBoundingClientRect().top + window.scrollY - headerOffset();
+      window.scrollTo({ top: Math.max(0, top), behavior: reduce ? "auto" : "smooth" });
     }, 200);
     return () => window.clearTimeout(startup);
   }, []);
@@ -256,16 +280,34 @@ export default function Home() {
     return () => { cancelled = true; window.clearTimeout(startup); };
   }, [activeCommodity]);
 
+  // Destaque da seção ativa: escolhe a ÚLTIMA seção cujo topo já cruzou uma linha
+  // de referência abaixo do topo — corresponde à seção que o usuário está vendo,
+  // sem a imprecisão da área de interseção (seção grande roubava o destaque).
   useEffect(() => {
-    const sections = ["visao-geral", "cotacoes", "recomendacoes", "operacoes", "radar", "anotacoes", "fontes"]
-      .map((id) => document.getElementById(id))
-      .filter((section): section is HTMLElement => Boolean(section));
-    const observer = new IntersectionObserver((entries) => {
-      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-      if (visible) setActiveSection(visible.target.id);
-    }, { rootMargin: "-18% 0px -65% 0px", threshold: [0, 0.1, 0.35] });
-    sections.forEach((section) => observer.observe(section));
-    return () => observer.disconnect();
+    const ids = ["visao-geral", "cotacoes", "recomendacoes", "operacoes", "radar", "anotacoes", "fontes"];
+    let ticking = false;
+    const pick = () => {
+      ticking = false;
+      const line = headerOffset() + 8;
+      let current = ids[0];
+      for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top - line <= 0) current = id;
+      }
+      // No fim da página, garante o destaque da última seção (curta, pode não cruzar a linha).
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4) {
+        current = ids[ids.length - 1];
+      }
+      setActiveSection(current);
+    };
+    const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(pick); } };
+    pick();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
   }, []);
 
   const activeMarket = data.markets.find((market) => market.id === activeCommodity) ?? data.markets[0] ?? null;
@@ -331,9 +373,9 @@ export default function Home() {
 
   function selectCommodity(id: CommodityId) {
     setActiveCommodity(id);
-    if (id === "milho") { setUnitCost(52); setFreight(3.5); }
-    if (id === "soja") { setUnitCost(112); setFreight(5); }
-    if (id === "boi") { setUnitCost(292); setFreight(4); }
+    if (id === "milho") { setUnitCost(52); setUnitCostDraft("52"); setFreight(3.5); setFreightDraft("3.5"); }
+    if (id === "soja") { setUnitCost(112); setUnitCostDraft("112"); setFreight(5); setFreightDraft("5"); }
+    if (id === "boi") { setUnitCost(292); setUnitCostDraft("292"); setFreight(4); setFreightDraft("4"); }
     document.getElementById("cotacoes")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -522,9 +564,9 @@ export default function Home() {
           <article className="panel simulator-panel">
             <div className="panel-head"><div><span className="section-kicker">Simulador de margem</span><h2>Teste uma proteção parcial</h2></div><span className="calculator-badge">Cenário</span></div>
             <div className="simulator-fields">
-              <label>Volume<input type="number" min="0" value={volume} onChange={(event) => setVolume(Math.max(0, Math.floor(Number(event.target.value) || 0)))} /></label>
-              <label>Custo por unidade<input type="number" min="0" step="0.01" value={unitCost} onChange={(event) => setUnitCost(Math.max(0, Number(event.target.value) || 0))} /></label>
-              <label>Frete por unidade<input type="number" min="0" step="0.01" value={freight} onChange={(event) => setFreight(Math.max(0, Number(event.target.value) || 0))} /></label>
+              <label>Volume<input type="text" inputMode="numeric" value={volumeDraft} onChange={(event) => { const s = sanitizeIntInput(event.target.value); setVolumeDraft(s.draft); setVolume(s.value); }} /></label>
+              <label>Custo por unidade<input type="text" inputMode="decimal" value={unitCostDraft} onChange={(event) => { const s = sanitizeDecimalInput(event.target.value); setUnitCostDraft(s.draft); setUnitCost(s.value); }} /></label>
+              <label>Frete por unidade<input type="text" inputMode="decimal" value={freightDraft} onChange={(event) => { const s = sanitizeDecimalInput(event.target.value); setFreightDraft(s.draft); setFreight(s.value); }} /></label>
               <label>Parcela protegida<select value={protectedShare} onChange={(event) => setProtectedShare(Number(event.target.value))}><option value={0}>0%</option><option value={20}>20%</option><option value={30}>30%</option><option value={50}>50%</option><option value={70}>70%</option></select></label>
             </div>
             <div className="simulation-results">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export function Modal({
   titleId,
@@ -48,7 +49,12 @@ export function Modal({
     }
   }
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  // Portaliza para o body: fora de qualquer containing block criado por ancestrais
+  // (ex.: backdrop-filter na sidebar mobile), o modal fixed volta a se posicionar
+  // pela viewport — senão nasce cortado no topo.
+  return createPortal(
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
       <section
         ref={dialogRef}
@@ -61,6 +67,7 @@ export function Modal({
       >
         {children}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

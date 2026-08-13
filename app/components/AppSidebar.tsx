@@ -24,12 +24,22 @@ export const NAV_ITEMS: NavItem[] = [
 // Rolagem programática até a seção: a âncora nativa não move o document neste
 // layout (sidebar fixa + hidratação), então rolamos explicitamente e refletimos a
 // URL sem novo salto. Mesmo padrão de selectCommodity em home-client.
+// Offset do topo: no mobile a sidebar vira barra fixa (sticky) e cobre o topo, então
+// descontamos a altura real dela; no desktop a sidebar é lateral (só uma folga).
+export function headerOffset(): number {
+  const mobile = window.matchMedia("(max-width: 900px)").matches;
+  if (!mobile) return 20;
+  const bar = document.querySelector(".sidebar");
+  return (bar ? bar.getBoundingClientRect().height : 118) + 8;
+}
+
 function scrollToSection(event: MouseEvent<HTMLAnchorElement>, hash: string) {
   const target = document.getElementById(hash);
   if (!target) return;
   event.preventDefault();
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  target.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+  const top = target.getBoundingClientRect().top + window.scrollY - headerOffset();
+  window.scrollTo({ top: Math.max(0, top), behavior: reduce ? "auto" : "smooth" });
   history.replaceState(null, "", `#${hash}`);
 }
 

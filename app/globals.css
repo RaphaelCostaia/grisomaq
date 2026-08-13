@@ -404,8 +404,8 @@ textarea { padding: 10px; resize: vertical; }
   .sidebar { position: sticky; inset: 0 auto auto 0; width: auto; height: auto; padding: 12px 18px 9px; border-right: 0; border-bottom: 1px solid var(--border-soft); backdrop-filter: blur(12px); }
   .brand { padding-bottom: 11px; }
   .brand-mark { width: 33px; height: 33px; flex-basis: 33px; }
-  .nav-list { display: flex; overflow-x: auto; padding-bottom: 3px; }
-  .nav-item { width: auto; min-height: 36px; white-space: nowrap; }
+  .nav-list { display: flex; overflow-x: auto; padding-bottom: 3px; -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent); mask-image: linear-gradient(90deg, #000 86%, transparent); }
+  .nav-item { width: auto; min-height: 36px; white-space: nowrap; flex: 0 0 auto; }
   .nav-item.is-active { box-shadow: inset 0 -2px var(--green), 0 0 0 1px rgba(95,226,154,.05); }
   .sidebar-foot { margin-top: 8px; }
   .sidebar-foot > p, .profile { display: none; }
